@@ -4,7 +4,7 @@ LEMON
 What is it?
 -----------
 
-From original documentation (http://www.hwaci.com/sw/lemon/lemon.html):
+From [original documentation](http://www.hwaci.com/sw/lemon/lemon.html "Documentation"):
 
 Lemon is an LALR(1) parser generator for C or C++. It does the same job as bison and yacc.
 But Lemon is not another bison or yacc clone. It uses a different grammar syntax which is designed to reduce the number of coding errors.
