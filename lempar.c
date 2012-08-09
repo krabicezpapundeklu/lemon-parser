@@ -3,6 +3,7 @@
 */
 /* First off, code is included that follows the "include" declaration
 ** in the input grammar file. */
+#include <assert.h>
 #include <stdio.h>
 %%
 /* Next is all token values, in a form suitable for use by makeheaders.
