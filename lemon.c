@@ -3060,7 +3060,7 @@ PRIVATE void tplt_xfer(char *name, FILE *in, FILE *out, int *lineno)
 
 /* The next function finds the template file and opens it, returning
 ** a pointer to the opened file. */
-PRIVATE FILE *tplt_open(struct lemon *lemp)
+PRIVATE FILE *tplt_open(struct lemon *lemp, const char **extension)
 {
   static char templatename[] = "lempar.c";
   char buf[1000];
@@ -3082,6 +3082,7 @@ PRIVATE FILE *tplt_open(struct lemon *lemp)
       lemp->errorcnt++;
       return 0;
     }
+    *extension = strrchr(user_templatename,'.');
     return in;
   }
 
@@ -3110,6 +3111,7 @@ PRIVATE FILE *tplt_open(struct lemon *lemp)
     lemp->errorcnt++;
     return 0;
   }
+  *extension = strrchr(tpltname,'.');
   return in;
 }
 
@@ -3581,10 +3583,12 @@ void ReportTable(
   int mnTknOfst, mxTknOfst;
   int mnNtOfst, mxNtOfst;
   struct axset *ax;
+  const char *extension;
 
-  in = tplt_open(lemp);
+  in = tplt_open(lemp, &extension);
   if( in==0 ) return;
-  out = file_open(lemp,".c","wb");
+  if( extension==0 ) extension = "";
+  out = file_open(lemp,extension,"wb");
   if( out==0 ){
     fclose(in);
     return;
