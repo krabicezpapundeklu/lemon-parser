@@ -1372,6 +1372,15 @@ static void handle_D_option(char *z){
   *z = 0;
 }
 
+static char *header_extension = ".h";
+static void handle_H_option(char *z){
+  header_extension = (char *) malloc( lemonStrlen(z)+1 );
+  if( header_extension==0 ){
+    memory_error();
+  }
+  strcpy(header_extension, z);
+}
+
 static char *user_templatename = NULL;
 static void handle_T_option(char *z){
   user_templatename = (char *) malloc( lemonStrlen(z)+1 );
@@ -1397,6 +1406,7 @@ int main(int argc, char **argv)
     {OPT_FLAG, "b", (char*)&basisflag, "Print only the basis in report."},
     {OPT_FLAG, "c", (char*)&compress, "Don't compress the action table."},
     {OPT_FSTR, "D", (char*)handle_D_option, "Define an %ifdef macro."},
+    {OPT_FSTR, "H", (char*)handle_H_option, "Specify a header extension."},
     {OPT_FSTR, "T", (char*)handle_T_option, "Specify a template file."},
     {OPT_FLAG, "g", (char*)&rpflag, "Print grammar without actions."},
     {OPT_FLAG, "m", (char*)&mhflag, "Output a makeheaders compatible file."},
@@ -3599,7 +3609,7 @@ void ReportTable(
   /* Generate the include code, if any */
   tplt_print(out,lemp,lemp->include,&lineno);
   if( mhflag ){
-    char *name = file_makename(lemp, ".h");
+    char *name = file_makename(lemp, header_extension);
     fprintf(out,"#include \"%s\"\n", name); lineno++;
     free(name);
   }
@@ -4023,7 +4033,7 @@ void ReportHeader(struct lemon *lemp)
 
   if( lemp->tokenprefix ) prefix = lemp->tokenprefix;
   else                    prefix = "";
-  in = file_open(lemp,".h","rb");
+  in = file_open(lemp,header_extension,"rb");
   if( in ){
     int nextChar;
     for(i=1; i<lemp->nterminal && fgets(line,LINESIZE,in); i++){
@@ -4037,7 +4047,7 @@ void ReportHeader(struct lemon *lemp)
       return;
     }
   }
-  out = file_open(lemp,".h","wb");
+  out = file_open(lemp,header_extension,"wb");
   if( out ){
     for(i=1; i<lemp->nterminal; i++){
       fprintf(out,"#define %s%-30s %2d\n",prefix,lemp->symbols[i]->name,i);
