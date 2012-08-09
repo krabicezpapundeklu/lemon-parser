@@ -1372,22 +1372,27 @@ static void handle_D_option(char *z){
   *z = 0;
 }
 
-static char *header_extension = ".h";
-static void handle_H_option(char *z){
-  header_extension = (char *) malloc( lemonStrlen(z)+1 );
-  if( header_extension==0 ){
+static void handle_option(char *z, char **out){
+  *out = (char *) malloc( lemonStrlen(z)+1 );
+  if( *out==0 ){
     memory_error();
   }
-  strcpy(header_extension, z);
+  strcpy(*out, z);
+}
+
+static char *header_extension = ".h";
+static void handle_H_option(char *z){
+  handle_option(z, &header_extension);
+}
+
+static char *filename_prefix = "";
+static void handle_P_option(char *z){
+  handle_option(z, &filename_prefix);
 }
 
 static char *user_templatename = NULL;
 static void handle_T_option(char *z){
-  user_templatename = (char *) malloc( lemonStrlen(z)+1 );
-  if( user_templatename==0 ){
-    memory_error();
-  }
-  strcpy(user_templatename, z);
+  handle_option(z, &user_templatename);
 }
 
 /* The main program.  Parse the command line and do it... */
@@ -1411,6 +1416,7 @@ int main(int argc, char **argv)
     {OPT_FLAG, "g", (char*)&rpflag, "Print grammar without actions."},
     {OPT_FLAG, "m", (char*)&mhflag, "Output a makeheaders compatible file."},
     {OPT_FLAG, "l", (char*)&nolinenosflag, "Do not print #line statements."},
+    {OPT_FSTR, "P", (char*)handle_P_option, "Specify a filename prefix."},
     {OPT_FLAG, "p", (char*)&showPrecedenceConflict,
                     "Show conflicts resolved by precedence rules"},
     {OPT_FLAG, "q", (char*)&quiet, "(Quiet) Don't print the report file."},
@@ -2720,13 +2726,39 @@ PRIVATE char *file_makename(struct lemon *lemp, const char *suffix)
 {
   char *name;
   char *cp;
+  int filename_prefix_length;
+  char *filename;
+  char *filename1;
+  char *filename2;
 
-  name = (char*)malloc( lemonStrlen(lemp->filename) + lemonStrlen(suffix) + 5 );
+  filename_prefix_length = lemonStrlen(filename_prefix);
+
+  name = (char*)malloc( filename_prefix_length + lemonStrlen(lemp->filename) + lemonStrlen(suffix) + 5 );
   if( name==0 ){
     fprintf(stderr,"Can't allocate space for a filename.\n");
     exit(1);
   }
-  strcpy(name,lemp->filename);
+
+  if( filename_prefix_length>0 ){
+    filename1 = strrchr(lemp->filename, '\\');
+    filename2 = strrchr(lemp->filename, '/');
+
+    filename = filename1 > filename2 ? filename1 : filename2;
+
+    if( filename==0 ){
+      strcpy(name,filename_prefix);
+      strcat(name,lemp->filename);
+	}
+	else{
+      ++filename;
+      strncpy(name,lemp->filename,filename - lemp->filename);
+      strncpy(name + (filename - lemp->filename),filename_prefix,filename_prefix_length + 1);
+      strcat(name,filename);
+	}
+  }
+  else{
+     strcpy(name,lemp->filename);
+  }
   cp = strrchr(name,'.');
   if( cp ) *cp = 0;
   strcat(name,suffix);
