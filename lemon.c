@@ -6,6 +6,10 @@
 **
 ** The author of this program disclaims copyright.
 */
+#ifdef _MSC_VER
+#   define _CRT_SECURE_NO_WARNINGS
+#endif
+
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
@@ -1472,13 +1476,27 @@ static void handle_D_option(char *z){
   *z = 0;
 }
 
-static char *user_templatename = NULL;
-static void handle_T_option(char *z){
-  user_templatename = (char *) malloc( lemonStrlen(z)+1 );
-  if( user_templatename==0 ){
+static void handle_option(char *z, char **out){
+  *out = (char *) malloc( lemonStrlen(z)+1 );
+  if( *out==0 ){
     memory_error();
   }
-  lemon_strcpy(user_templatename, z);
+  lemon_strcpy(*out, z);
+}
+
+static char *header_extension = ".h";
+static void handle_H_option(char *z){
+  handle_option(z, &header_extension);
+}
+
+static char *filename_prefix = "";
+static void handle_P_option(char *z){
+  handle_option(z, &filename_prefix);
+}
+
+static char *user_templatename = NULL;
+static void handle_T_option(char *z){
+  handle_option(z, &user_templatename);
 }
 
 /* The main program.  Parse the command line and do it... */
@@ -1497,10 +1515,12 @@ int main(int argc, char **argv)
     {OPT_FLAG, "b", (char*)&basisflag, "Print only the basis in report."},
     {OPT_FLAG, "c", (char*)&compress, "Don't compress the action table."},
     {OPT_FSTR, "D", (char*)handle_D_option, "Define an %ifdef macro."},
+    {OPT_FSTR, "H", (char*)handle_H_option, "Specify a header extension."},
     {OPT_FSTR, "T", (char*)handle_T_option, "Specify a template file."},
     {OPT_FLAG, "g", (char*)&rpflag, "Print grammar without actions."},
     {OPT_FLAG, "m", (char*)&mhflag, "Output a makeheaders compatible file."},
     {OPT_FLAG, "l", (char*)&nolinenosflag, "Do not print #line statements."},
+    {OPT_FSTR, "P", (char*)handle_P_option, "Specify a filename prefix."},
     {OPT_FLAG, "p", (char*)&showPrecedenceConflict,
                     "Show conflicts resolved by precedence rules"},
     {OPT_FLAG, "q", (char*)&quiet, "(Quiet) Don't print the report file."},
@@ -2851,13 +2871,40 @@ PRIVATE char *file_makename(struct lemon *lemp, const char *suffix)
 {
   char *name;
   char *cp;
+  int filename_prefix_length;
+  char *filename;
+  char *filename1;
+  char *filename2;
 
-  name = (char*)malloc( lemonStrlen(lemp->filename) + lemonStrlen(suffix) + 5 );
+  filename_prefix_length = lemonStrlen(filename_prefix);
+
+  name = (char*)malloc( filename_prefix_length + lemonStrlen(lemp->filename) + lemonStrlen(suffix) + 5 );
   if( name==0 ){
     fprintf(stderr,"Can't allocate space for a filename.\n");
     exit(1);
   }
-  lemon_strcpy(name,lemp->filename);
+
+  if( filename_prefix_length>0 ){
+    filename1 = strrchr(lemp->filename, '\\');
+    filename2 = strrchr(lemp->filename, '/');
+
+    filename = filename1 > filename2 ? filename1 : filename2;
+
+    if( filename==0 ){
+      lemon_strcpy(name,filename_prefix);
+      lemon_strcat(name,lemp->filename);
+	}
+	else{
+      ++filename;
+      strncpy(name,lemp->filename,filename - lemp->filename);
+      strncpy(name + (filename - lemp->filename),filename_prefix,filename_prefix_length + 1);
+      lemon_strcat(name,filename);
+	}
+  }
+  else{
+     strcpy(name,lemp->filename);
+  }
+
   cp = strrchr(name,'.');
   if( cp ) *cp = 0;
   lemon_strcat(name,suffix);
@@ -3205,7 +3252,7 @@ PRIVATE void tplt_xfer(char *name, FILE *in, FILE *out, int *lineno)
 
 /* The next function finds the template file and opens it, returning
 ** a pointer to the opened file. */
-PRIVATE FILE *tplt_open(struct lemon *lemp)
+PRIVATE FILE *tplt_open(struct lemon *lemp, const char **extension)
 {
   static char templatename[] = "lempar.c";
   char buf[1000];
@@ -3227,6 +3274,7 @@ PRIVATE FILE *tplt_open(struct lemon *lemp)
       lemp->errorcnt++;
       return 0;
     }
+    *extension = strrchr(user_templatename,'.');
     return in;
   }
 
@@ -3255,6 +3303,7 @@ PRIVATE FILE *tplt_open(struct lemon *lemp)
     lemp->errorcnt++;
     return 0;
   }
+  *extension = strrchr(tpltname,'.');
   return in;
 }
 
@@ -3728,10 +3777,12 @@ void ReportTable(
   int mnTknOfst, mxTknOfst;
   int mnNtOfst, mxNtOfst;
   struct axset *ax;
+  const char *extension;
 
-  in = tplt_open(lemp);
+  in = tplt_open(lemp, &extension);
   if( in==0 ) return;
-  out = file_open(lemp,".c","wb");
+  if( extension==0 ) extension = "";
+  out = file_open(lemp,extension,"wb");
   if( out==0 ){
     fclose(in);
     return;
@@ -3742,7 +3793,7 @@ void ReportTable(
   /* Generate the include code, if any */
   tplt_print(out,lemp,lemp->include,&lineno);
   if( mhflag ){
-    char *name = file_makename(lemp, ".h");
+    char *name = file_makename(lemp, header_extension);
     fprintf(out,"#include \"%s\"\n", name); lineno++;
     free(name);
   }
@@ -4166,7 +4217,7 @@ void ReportHeader(struct lemon *lemp)
 
   if( lemp->tokenprefix ) prefix = lemp->tokenprefix;
   else                    prefix = "";
-  in = file_open(lemp,".h","rb");
+  in = file_open(lemp,header_extension,"rb");
   if( in ){
     int nextChar;
     for(i=1; i<lemp->nterminal && fgets(line,LINESIZE,in); i++){
@@ -4181,7 +4232,7 @@ void ReportHeader(struct lemon *lemp)
       return;
     }
   }
-  out = file_open(lemp,".h","wb");
+  out = file_open(lemp,header_extension,"wb");
   if( out ){
     for(i=1; i<lemp->nterminal; i++){
       fprintf(out,"#define %s%-30s %3d\n",prefix,lemp->symbols[i]->name,i);
